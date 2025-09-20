@@ -1,6 +1,6 @@
-import {MatrixRecycler} from "./Libs/matrixRecycler.js";
+import {MatrixRecycler} from "../Libs/matrixRecycler.js";
 
-export default class Camera {
+export class Camera {
     constructor() {
         this.position = new Float32Array(3);
         this.rotation = new Float32Array(3);
@@ -52,13 +52,12 @@ export default class Camera {
         this.position[2] += vec[2];
         this.UpdateView();
     }
-    ProjectGeo(geo) {
-        let projectedFaces = [];
+    ProjectGeo(geo,buffer) {
         for(let i =0; i<geo.faces.length; i++) {
-            let face = [[ ...geo.faces[i][0][0], ...geo.faces[i][0][1], ...geo.faces[i][0][2], 0,0,0,1],geo.faces[i][1],geo.faces[i][2]];
-            MatrixRecycler.Transpose(face[0]);
-            MatrixRecycler.MatProd(this.viewMatrix, face[0]);
-            projectedFaces.push(face);
+            let face = [[ ...geo.faces[i][0], ...geo.faces[i][1], ...geo.faces[i][2], 0,0,0,1],geo.faces[i][3],geo.faces[i][4]];
+            this.MatrixRecycler.Transpose(face[0]);
+            this.MatrixRecycler.MatProd(this.viewMatrix, face[0]);
+            buffer.push(face);
         }
     }
 }

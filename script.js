@@ -1,6 +1,8 @@
 import { TextureLoader } from "./textureLoader.js";
 import { Rasterizer } from "./rasterizer.js";
 import { KeyEvents } from "./KeyEvents.js";
+import { Camera } from "./camera.js";
+import { Cube } from "./cube.js";
 
 const c = document.getElementById("view");
 const ctx = c.getContext('2d');
@@ -14,6 +16,16 @@ profiler[1] = new BigInt64Array(2);//counters (64 because 1920*1080 is close eno
 const rasterizer = new Rasterizer(c);
 const TL = new TextureLoader(rasterizer);
 
+const camera = new Camera();
+
+const cube1 = new Cube([-10, 0, 20], [0, 0, 0], 5);
+
 function NewFrame() {
-    
+    let zBuffer = [];
+    camera.ProjectGeo(cube1,zBuffer);
+
+    rasterizer.DrawPolygons(zBuffer,profiler);
+
+    window.requestAnimationFrame(NewFrame);   
 }
+NewFrame();

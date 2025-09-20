@@ -1,5 +1,5 @@
-import {MatrixRecycler} from "./Libs/matrixRecycler.js";
-export default class Transform {
+import {MatrixRecycler} from "../Libs/matrixRecycler.js";
+export class Transform {
     constructor() {
         this.position = new Float32Array(3);
         this.rotation = new Float32Array(3);

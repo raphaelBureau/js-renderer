@@ -1,4 +1,5 @@
-export default class Geo extends Transform {
+import { Transform } from "./transform.js";
+export class Geo extends Transform {
     constructor(vertices, faces) {
         super();
         this.vertices = vertices; //array of Float32Array(3)

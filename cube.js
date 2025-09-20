@@ -1,5 +1,5 @@
 import { Geo } from "./geo.js";
-export default class Cube extends Geo {
+export class Cube extends Geo {
     constructor(position = [0, 0, 0], rotation = [0, 0, 0], size = 5) {
         let texture = 0;
         let vertices = [[0, 0, 0, 1], [1, 0, 0, 1], [0, 0, 1, 1], [1, 0, 1, 1],
@@ -23,8 +23,8 @@ export default class Cube extends Geo {
         faces.push([vertices[7], vertices[6], vertices[4], [[0, 0], [1, 0], [1, 1]], texture]);
         faces.push([vertices[7], vertices[4], vertices[5], [[0, 0], [1, 1], [0, 1]], texture]);
         super(vertices, faces);
-        this.setPosition(position);
-        this.setRotation(rotation);
-        this.setScale([size, size, size]);
+        this.SetPosition(position);
+        this.SetRotation(rotation);
+        this.SetScale([size, size, size]);
     }
 }
