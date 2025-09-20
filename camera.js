@@ -54,9 +54,22 @@ export class Camera {
     }
     ProjectGeo(geo,buffer) {
         for(let i =0; i<geo.faces.length; i++) {
-            let face = [[ ...geo.faces[i][0], ...geo.faces[i][1], ...geo.faces[i][2], 0,0,0,1],geo.faces[i][3],geo.faces[i][4]];
-            this.MatrixRecycler.Transpose(face[0]);
-            this.MatrixRecycler.MatProd(this.viewMatrix, face[0]);
+            let vertCopy = new Float32Array(12);
+            vertCopy[0] = geo.faces[i][0][0];
+            vertCopy[1] = geo.faces[i][0][1];
+            vertCopy[2] = geo.faces[i][0][2];
+            vertCopy[3] = geo.faces[i][0][3];
+            vertCopy[4] = geo.faces[i][0][4];
+            vertCopy[5] = geo.faces[i][0][5];
+            vertCopy[6] = geo.faces[i][0][6];
+            vertCopy[7] = geo.faces[i][0][7];
+            vertCopy[8] = geo.faces[i][0][8];
+            vertCopy[9] = geo.faces[i][0][9];
+            vertCopy[10] = geo.faces[i][0][10];
+            vertCopy[11] = geo.faces[i][0][11];
+            let face = [vertCopy,geo.faces[i][1],geo.faces[i][2]];
+            this.MatrixRecycler.Vec3Prod(geo.transformMatrix, face[0]);
+            //this.MatrixRecycler.Vec3Prod(this.viewMatrix, face[0]);
             buffer.push(face);
         }
     }

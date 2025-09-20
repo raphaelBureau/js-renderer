@@ -28,12 +28,16 @@ export class Rasterizer {
     }
     DrawPolygons(buffer, profiler) {
         let len = buffer.length;
+        for(let i =0; i<this.frameBuffer.data.length; i+=4) {
+            this.frameBuffer.data[i] = 50;
+            this.frameBuffer.data[i+1] = 50;
+            this.frameBuffer.data[i+2] = 50;
+            this.frameBuffer.data[i+3] = 255;
+        }
+        for (let i = this.depthBuffer.length; i--;) {
+            this.depthBuffer[i] = 0;
+        }
         for (let i = 0; i < len; i++) {
-            let verts = new Array(3);
-            for (let j = 0; j < 3; j++) {
-                verts[j] = [buffer[i][0][j], buffer[i][0][j + 4], buffer[i][0][j + 8]];
-            }
-            buffer[i] = [...verts, buffer[i][1], buffer[i][2]];
             this.DrawTriangle(buffer[i], profiler);
         }
         this.SendFrameData();
@@ -45,13 +49,13 @@ export class Rasterizer {
         let verts = face;
         let rgba = face[2];
         //bounding box
-        let minX = ~~(Math.min(verts[0][0], verts[1][0], verts[2][0]));
-        let minY = ~~(Math.min(verts[0][1], verts[1][1], verts[2][1]));
-        let maxX = ~~(Math.max(verts[0][0], verts[1][0], verts[2][0]));
-        let maxY = ~~(Math.max(verts[0][1], verts[1][1], verts[2][1]));
+        let minX = ~~(Math.min(face[0][0], face[0][1], face[0][2]));
+        let minY = ~~(Math.min(face[0][3], face[0][4], face[0][5]));
+        let maxX = ~~(Math.max(face[0][0], face[0][1], face[0][2]));
+        let maxY = ~~(Math.max(face[0][3], face[0][4], face[0][5]));
 
-        let bestZ = Math.min(verts[0][2], verts[1][2], verts[2][2]);
-        let farthestZ = Math.max(verts[0][2], verts[1][2], verts[2][2]);
+        let bestZ = Math.min(face[0][6], face[0][7], face[0][8]);
+        let farthestZ = Math.max(face[0][6], face[0][7], face[0][8]);
         if (farthestZ < this.near) {
             return;
         }
@@ -70,13 +74,10 @@ export class Rasterizer {
 
         maxY = Math.max(maxY, 0);
         maxY = Math.min(maxY, this.height);
-        if (minX > this.width || minY > this.height) {
-            console.log(minX, maxX, minY, maxY);
-        }
 
         let InTri = false;
-        let v0 = [verts[1][0] - verts[0][0], verts[1][1] - verts[0][1]];
-        let v1 = [verts[2][0] - verts[0][0], verts[2][1] - verts[0][1]];
+        let v0 = [face[0][1] - face[0][0], face[0][4] - face[0][3]];
+        let v1 = [face[0][2] - face[0][0], face[0][5] - face[0][3]];
         let DBI = 0;
         //declare les variables hors du scope pour sauver au max 1.8m de declarations inutiles
         let denom = 1 / (v0[0] * v1[1] - v1[0] * v0[1]); //multiplication plus rapide que division
@@ -91,17 +92,17 @@ export class Rasterizer {
         let pixelY = 0;
         let Vy1 = 0
         let Vy2 = 0
-        let v32x = (verts[2][0] - verts[1][0]);
-        let v13x = verts[0][0] - verts[2][0];
-        let v21x = verts[1][0] - verts[0][0];
+        let v32x = (face[0][2] - face[0][1]);
+        let v13x = face[0][0] - face[0][2];
+        let v21x = face[0][1] - face[0][0];
 
-        let v32y = (verts[2][1] - verts[1][1]);
-        let v13y = verts[0][1] - verts[2][1];
-        let v21y = verts[1][1] - verts[0][1];
+        let v32y = (face[0][5] - face[0][4]);
+        let v13y = face[0][3] - face[0][5];
+        let v21y = face[0][4] - face[0][3];
 
-        let vertXv32y = v32y * verts[1][0];
-        let vertXv13y = v13y * verts[2][0];
-        let vertXv21y = v21y * verts[0][0];
+        let vertXv32y = v32y * face[0][4];
+        let vertXv13y = v13y * face[0][5];
+        let vertXv21y = v21y * face[0][0];
 
         let yv1y = 0
         let yv2y = 0
@@ -126,27 +127,25 @@ export class Rasterizer {
         let uvY1;
         let uvY2;
         let index = 0;
-        if (verts[4] != 0) {
-            textureColor = this.textures[verts[3][3] - 1][0];
-            textureX = this.textures[verts[3][3] - 1][1];
-            textureY = this.textures[verts[3][3] - 1][2];
-            uvX0 = textureX * verts[3][0][0];
-            uvX1 = textureX * verts[3][1][0];
-            uvX2 = textureX * verts[3][2][0];
-            uvY0 = textureY * verts[3][0][1];
-            uvY1 = textureY * verts[3][1][1];
-            uvY2 = textureY * verts[3][2][1];
-        }
+        textureColor = this.textures[face[1][3]][0];
+        textureX = this.textures[face[1][3]][1];
+        textureY = this.textures[face[1][3]][2];
+        uvX0 = textureX * face[1][0][0];
+        uvX1 = textureX * face[1][1][0];
+        uvX2 = textureX * face[1][2][0];
+        uvY0 = textureY * face[1][0][1];
+        uvY1 = textureY * face[1][1][1];
+        uvY2 = textureY * face[1][2][1];
         //debut des boucles fin de la complexite o de 1 qui est vraiment crazy
         for (let y = minY; y <= maxY; y++) {//optimisations possibles GENRE BEAUCOUP
             //complexite o de n
             DBI = y * this.width + vecMX;
             pixelY = y * this.width * 4;
-            Vy1 = (y - verts[0][1]) * v0[1];
-            Vy2 = (y - verts[0][1]) * v1[1];
-            yv1y = y - verts[0][1];
-            yv2y = y - verts[1][1];
-            yv3y = y - verts[2][1];
+            Vy1 = (y - face[0][3]) * v0[1];
+            Vy2 = (y - face[0][3]) * v1[1];
+            yv1y = y - face[0][3];
+            yv2y = y - face[0][4];
+            yv3y = y - face[0][5];
 
             c1 = (v32x) * (yv2y)
             c2 = (v13x) * (yv3y)
@@ -172,15 +171,15 @@ export class Rasterizer {
                     ) {//tank la performance
                         //je sauve des function calls en faisant ca
 
-                        alpha = ((x - verts[0][0]) * v1[1] - v1[0] * (y - verts[0][1])) * denom;
-                        beta = (v0[0] * (y - verts[0][1]) - (x - verts[0][0]) * v0[1]) * denom;
+                        alpha = ((x - face[0][0]) * v1[1] - v1[0] * (y - face[0][3])) * denom;
+                        beta = (v0[0] * (y - face[0][3]) - (x - face[0][0]) * v0[1]) * denom;
                         gamma = 1 - alpha - beta;
-                        depth = gamma * verts[0][2] + alpha * verts[1][2] + beta * verts[2][2];
+                        depth = gamma * face[0][6] + alpha * face[0][7] + beta * face[0][8];
                         if ((depthValue == 0 || depthValue > depth) && depth > near) {
                             DB[DBI] = depth;
                             profiler[1][1]++;//metrics
                             //light calculations
-                            if (verts[0].length > 3) {
+                            if (false) {
 
                                 shade = (1 - (verts[0][3][1] * gamma + verts[1][3][1] * alpha + verts[2][3][1] * beta)) / 2
                                 if (shade < 0.1) {
@@ -195,18 +194,11 @@ export class Rasterizer {
                                 FB[pixelI + 2] = beta * preCalcShade;
                             }
                             else {
-                                if (verts[4] != 0) {
                                     index = 4 * (~~(gamma * uvX0 + alpha * uvX1 + beta * uvX2) + ~~(gamma * uvY0 + alpha * uvY1 + beta * uvY2) * textureX);//coute genre 20fps
 
                                     FB[pixelI] = textureColor[index] * shade;
                                     FB[pixelI + 1] = textureColor[index + 1] * shade;
                                     FB[pixelI + 2] = textureColor[index + 2] * shade;
-                                }
-                                else {
-                                    FB[pixelI] = rgba[0] * shade;
-                                    FB[pixelI + 1] = rgba[1] * shade;
-                                    FB[pixelI + 2] = rgba[2] * shade;
-                                }
                             }
                         }
                         InTri = true;
@@ -214,7 +206,7 @@ export class Rasterizer {
                     else {
                         if (InTri) {
                             //si on etais dans le triangle et maintenant on est sorti, il est impossible de retourner dans le triangle a partir de la meme ligne
-                            pixelRef[2] += maxX - x;
+                            //pixelRef[2] += maxX - x;
                             break;
                         }
                     }

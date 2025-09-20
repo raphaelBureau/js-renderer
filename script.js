@@ -16,16 +16,19 @@ profiler[1] = new BigInt64Array(2);//counters (64 because 1920*1080 is close eno
 const rasterizer = new Rasterizer(c);
 const TL = new TextureLoader(rasterizer);
 
+TL.Get(["buffRaph"]);
+
 const camera = new Camera();
 
-const cube1 = new Cube([-10, 0, 20], [0, 0, 0], 5);
+const cube1 = new Cube([1500, 400, -100], [0, 0, 0], 50);
 
 function NewFrame() {
     let zBuffer = [];
+    cube1.AddRotation([0, 0.1, 0]);
     camera.ProjectGeo(cube1,zBuffer);
 
     rasterizer.DrawPolygons(zBuffer,profiler);
 
     window.requestAnimationFrame(NewFrame);   
 }
-NewFrame();
+TL.Load(() => NewFrame());
