@@ -52,4 +52,13 @@ export default class Camera {
         this.position[2] += vec[2];
         this.UpdateView();
     }
+    ProjectGeo(geo) {
+        let projectedFaces = [];
+        for(let i =0; i<geo.faces.length; i++) {
+            let face = [[ ...geo.faces[i][0][0], ...geo.faces[i][0][1], ...geo.faces[i][0][2]],geo.faces[i][1],geo.faces[i][2]];
+            MatrixRecycler.Transpose(face[0]);
+            MatrixRecycler.MatProd(this.viewMatrix, face[0]);
+            projectedFaces.push(face);
+        }
+    }
 }
