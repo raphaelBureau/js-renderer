@@ -3,6 +3,7 @@ export class Transform {
     constructor() {
         this.position = new Float32Array(3);
         this.rotation = new Float32Array(3);
+        this.scale = new Float32Array(3);
         this.translationMatrix = MatrixRecycler.Identity();
         this.rotationMatrix = MatrixRecycler.Identity();
         this.scaleMatrix = MatrixRecycler.Identity();
@@ -53,6 +54,9 @@ export class Transform {
         this.scaleMatrix[0] = vec[0];
         this.scaleMatrix[5] = vec[1];
         this.scaleMatrix[10] = vec[2];
+        this.scale[0] = vec[0];
+        this.scale[1] = vec[1];
+        this.scale[2] = vec[2];
         this.UpdateTransform();
     }
     

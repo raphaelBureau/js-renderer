@@ -9,6 +9,7 @@ export class Cube extends Geo {
             vertices[i][1] -= 0.5;
             vertices[i][2] -= 0.5;
         }
+        console.log(vertices);
         let faces = [];
         faces.push([Geo.CreateVertexMatrix(vertices[2], vertices[1], vertices[0]), [[0, 0], [1, 1], [0, 1], texture]]);
         faces.push([Geo.CreateVertexMatrix(vertices[2], vertices[3], vertices[1]), [[0, 0], [1, 0], [1, 1], texture]]);

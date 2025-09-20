@@ -20,7 +20,7 @@ TL.Get(["buffRaph"]);
 
 const camera = new Camera();
 
-const cube1 = new Cube([1500, 400, -100], [0, 0, 0], 50);
+const cube1 = new Cube([100, 100, 1000], [0, 0, 0], 100);
 
 let buff = [];
 camera.ProjectGeo(cube1,buff);
@@ -28,7 +28,7 @@ console.log(buff);
 
 function NewFrame() {
     let zBuffer = [];
-    //cube1.AddRotation([0.1, 0.1, 0]);
+    cube1.AddRotation([0.01, 0.01, 0]);
     camera.ProjectGeo(cube1,zBuffer);
 
     rasterizer.DrawPolygons(zBuffer,profiler);

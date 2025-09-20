@@ -97,11 +97,11 @@ export class Rasterizer {
         let v21x = face[0][1] - face[0][0];
 
         let v32y = (face[0][5] - face[0][4]);
-        let v13y = face[0][3] - face[0][5];
+        let v13y = face[0][3] - face[0][2];
         let v21y = face[0][4] - face[0][3];
 
-        let vertXv32y = v32y * face[0][4];
-        let vertXv13y = v13y * face[0][5];
+        let vertXv32y = v32y * face[0][1];
+        let vertXv13y = v13y * face[0][2];
         let vertXv21y = v21y * face[0][0];
 
         let yv1y = 0
