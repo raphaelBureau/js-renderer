@@ -30,28 +30,8 @@ export class Rasterizer {
         }
         this.SendFrameData();
     }
-    SendFrameData() {//quand meme ressource intensive et pourrais etre remplacé par une skybox
-        let data = this.canvasData.data;
-        let fb = this.frameBuffer;
-        let len = data.length;
-        for (let i=len; i--;) {
-            data[i] = fb[i];
-            fb[i] = 255;
-            i--;
-            data[i] = fb[i];
-            fb[i] = 50;
-            i--;
-            data[i] = fb[i];
-            fb[i] = 50;
-            i--;
-            data[i] = fb[i];
-            fb[i] = 50;
-        }
-        len = this.width*this.height;
-        for(let i =len; i--;){
-            this.depthBuffer[i] = 0;
-        }
-        this.ctx.putImageData(this.canvasData, 0, 0);
+    SendFrameData() {
+        this.ctx.putImageData(this.frameBuffer, 0, 0);
     }
     DrawTriangle(face,profiler) {
         let verts = face[0];
