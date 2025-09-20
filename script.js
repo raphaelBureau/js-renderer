@@ -22,9 +22,13 @@ const camera = new Camera();
 
 const cube1 = new Cube([1500, 400, -100], [0, 0, 0], 50);
 
+let buff = [];
+camera.ProjectGeo(cube1,buff);
+console.log(buff);
+
 function NewFrame() {
     let zBuffer = [];
-    cube1.AddRotation([0, 0.1, 0]);
+    //cube1.AddRotation([0.1, 0.1, 0]);
     camera.ProjectGeo(cube1,zBuffer);
 
     rasterizer.DrawPolygons(zBuffer,profiler);

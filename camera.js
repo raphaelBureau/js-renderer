@@ -67,7 +67,7 @@ export class Camera {
             vertCopy[9] = geo.faces[i][0][9];
             vertCopy[10] = geo.faces[i][0][10];
             vertCopy[11] = geo.faces[i][0][11];
-            let face = [vertCopy,geo.faces[i][1],geo.faces[i][2]];
+            let face = [vertCopy,geo.faces[i][1]];
             this.MatrixRecycler.Vec3Prod(geo.transformMatrix, face[0]);
             //this.MatrixRecycler.Vec3Prod(this.viewMatrix, face[0]);
             buffer.push(face);
