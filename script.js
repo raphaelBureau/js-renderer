@@ -19,8 +19,21 @@ const TL = new TextureLoader(rasterizer);
 TL.Get(["buffRaph"]);
 
 const camera = new Camera();
+camera.SetViewport(window.innerWidth, window.innerHeight);
+const KE = new KeyEvents();
+KE.AddEvent("w", () => camera.movement[0] = 1, () => camera.movement[0] = 0);
+KE.AddEvent("s", () => camera.movement[1] = 1, () => camera.movement[1] = 0);
+KE.AddEvent("a", () => camera.movement[2] = 1, () => camera.movement[2] = 0);
+KE.AddEvent("d", () => camera.movement[3] = 1, () => camera.movement[3] = 0);
+KE.AddEvent("shift", () => camera.movement[4] = 1, () => camera.movement[4] = 0);
+KE.AddEvent(" ", () => camera.movement[5] = 1, () => camera.movement[5] = 0);
+KE.AddEvent("arrowleft", () => camera.AddRotation([0, -0.1, 0]));
+KE.AddEvent("arrowright", () => camera.AddRotation([0, 0.1, 0]));
+KE.AddEvent("arrowup", () => camera.AddRotation([-0.1, 0, 0]));
+KE.AddEvent("arrowdown", () => camera.AddRotation([0.1, 0, 0]));
+KE.AddEvent("y", () => rasterizer.uvMode = !rasterizer.uvMode);
 
-const cube1 = new Cube([100, 100, 1000], [0, 0, 0], 100);
+const cube1 = new Cube([0, 0, -5], [0, 0, 0], 1);
 
 let buff = [];
 camera.ProjectGeo(cube1,buff);
@@ -29,6 +42,7 @@ console.log(buff);
 function NewFrame() {
     let zBuffer = [];
     cube1.AddRotation([0.01, 0.01, 0]);
+    camera.Update();
     camera.ProjectGeo(cube1,zBuffer);
 
     rasterizer.DrawPolygons(zBuffer,profiler);
