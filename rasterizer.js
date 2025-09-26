@@ -28,11 +28,11 @@ export class Rasterizer {
     }
     DrawPolygons(buffer, profiler) {
         let len = buffer.length;
-        for(let i =0; i<this.frameBuffer.data.length; i+=4) {
+        for (let i = 0; i < this.frameBuffer.data.length; i += 4) {
             this.frameBuffer.data[i] = 50;
-            this.frameBuffer.data[i+1] = 50;
-            this.frameBuffer.data[i+2] = 50;
-            this.frameBuffer.data[i+3] = 255;
+            this.frameBuffer.data[i + 1] = 50;
+            this.frameBuffer.data[i + 2] = 50;
+            this.frameBuffer.data[i + 3] = 255;
         }
         for (let i = this.depthBuffer.length; i--;) {
             this.depthBuffer[i] = 0;
@@ -46,173 +46,138 @@ export class Rasterizer {
         this.ctx.putImageData(this.frameBuffer, 0, 0);
     }
     DrawTriangle(face, profiler) {
-        let verts = face;
-        let rgba = face[2];
-        //bounding box
-        let minX = ~~(Math.min(face[0][0], face[0][1], face[0][2]));
-        let minY = ~~(Math.min(face[0][3], face[0][4], face[0][5]));
-        let maxX = ~~(Math.max(face[0][0], face[0][1], face[0][2]));
-        let maxY = ~~(Math.max(face[0][3], face[0][4], face[0][5]));
+        // -- Setup (locals)
+        const i0 = face[0][1], i1 = face[0][2], i2 = face[0][3];
+        // screen-space vertices (after viewport; w==1 here):
+        const V = face[0][0];
+        const x0 = V[i0 * 4], y0 = V[i0 * 4 + 1], z0 = V[i0 * 4 + 2];
+        const x1 = V[i1 * 4], y1 = V[i1 * 4 + 1], z1 = V[i1 * 4 + 2];
+        const x2 = V[i2 * 4], y2 = V[i2 * 4 + 1], z2 = V[i2 * 4 + 2];
 
-        let bestZ = Math.min(face[0][6], face[0][7], face[0][8]);
-        let farthestZ = Math.max(face[0][6], face[0][7], face[0][8]);
-        if (farthestZ < this.near) {
-            return;
-        }
-        let near = this.near;
+        // per-vertex clip-space w captured earlier (BEFORE divide by w):
+        const w0c = face[2].wValues[i0], w1c = face[2].wValues[i1], w2c = face[2].wValues[i2];
 
-        minX = Math.max(minX, 0);
-        let vecMX = minX - 1;
-        minX = Math.min(minX, this.width);
+        // texture + UVs (match v0,v1,v2 order):
+        const texId = face[1][3];
+        const texData = this.textures[texId][0];
+        const texW = this.textures[texId][1] | 0;
+        const texH = this.textures[texId][2] | 0;
+        // UVs in [0,1] scaled to texels (top-left origin). If your images are bottom-left,
+        // either flip here: uvY* = texH - 1 - (face[1][k][1]*texH) or flip at sample time.
+        const u0 = face[1][0][0] * texW, v0uv = face[1][0][1] * texH;
+        const u1 = face[1][1][0] * texW, v1uv = face[1][1][1] * texH;
+        const u2 = face[1][2][0] * texW, v2uv = face[1][2][1] * texH;
 
-        maxX = Math.max(maxX, 0);
-        maxX = Math.min(maxX, this.width);
+        // --- build bounding box (clamp)
+        const W = this.width | 0, H = this.height | 0, DB = this.depthBuffer, FB = this.frameBuffer.data;
+        let minX = Math.floor(Math.min(x0, x1, x2));
+        let maxX = Math.floor(Math.max(x0, x1, x2));
+        let minY = Math.floor(Math.min(y0, y1, y2));
+        let maxY = Math.floor(Math.max(y0, y1, y2));
+        if (minX < 0) minX = 0; if (minY < 0) minY = 0;
+        if (maxX >= W) maxX = W - 1; if (maxY >= H) maxY = H - 1;
+        if (minX > maxX || minY > maxY) return;
 
+        // --- edge functions (CCW). Evaluate at pixel centers (x+0.5,y+0.5) for robust coverage.
+        const A01 = y0 - y1, B01 = x1 - x0;
+        const A12 = y1 - y2, B12 = x2 - x1;
+        const A20 = y2 - y0, B20 = x0 - x2;
 
-        minY = Math.max(minY, 0);
-        minY = Math.min(minY, this.height);
+        // signed area (twice the area). Keep the sign; don’t abs().
+        const area = A12 * (x0 - x2) + B12 * (y0 - y2);
+        if (area === 0) return; // degenerate
+        const invArea = 1.0 / area;
 
-        maxY = Math.max(maxY, 0);
-        maxY = Math.min(maxY, this.height);
+        // start values at top-left pixel center
+        const px0 = minX + 0.5, py0 = minY + 0.5;
+        let e0Row = (A12 * (px0 - x2) + B12 * (py0 - y2)); // weight for v0
+        let e1Row = (A20 * (px0 - x0) + B20 * (py0 - y0)); // weight for v1
+        let e2Row = (A01 * (px0 - x1) + B01 * (py0 - y1)); // weight for v2
 
-        let InTri = false;
-        let v0 = [face[0][1] - face[0][0], face[0][4] - face[0][3]];
-        let v1 = [face[0][2] - face[0][0], face[0][5] - face[0][3]];
-        let DBI = 0;
-        //declare les variables hors du scope pour sauver au max 1.8m de declarations inutiles
-        let denom = 1 / (v0[0] * v1[1] - v1[0] * v0[1]); //multiplication plus rapide que division
-        let alpha = 0;
-        let beta = 0;
-        let gamma = 0;
-        let depth = 0;
-        let pixelI = 0;
-        let DB = this.depthBuffer;
-        let FB = this.frameBuffer.data;
-        let depthValue = 0;
-        let pixelY = 0;
-        let Vy1 = 0
-        let Vy2 = 0
-        let v32x = (face[0][2] - face[0][1]);
-        let v13x = face[0][0] - face[0][2];
-        let v21x = face[0][1] - face[0][0];
+        // per-pixel edge increments
+        const de0dx = A12, de0dy = B12;
+        const de1dx = A20, de1dy = B20;
+        const de2dx = A01, de2dy = B01;
 
-        let v32y = (face[0][5] - face[0][4]);
-        let v13y = face[0][3] - face[0][5];
-        let v21y = face[0][4] - face[0][3];
+        // --- build PERSPECTIVE-CORRECT planes --------------------------------------
+        // pre-divided per-vertex terms
+        const up0 = u0 / w0c, vp0 = v0uv / w0c, wp0 = 1.0 / w0c;
+        const up1 = u1 / w1c, vp1 = v1uv / w1c, wp1 = 1.0 / w1c;
+        const up2 = u2 / w2c, vp2 = v2uv / w2c, wp2 = 1.0 / w2c;
 
-        let vertXv32y = v32y * face[0][1];
-        let vertXv13y = v13y * face[0][2];
-        let vertXv21y = v21y * face[0][0];
+        // row-start barycentrics (weights for v0,v1; v2 = 1 - w0 - w1)
+        let w0Row = e0Row * invArea;
+        let w1Row = e1Row * invArea;
+        let w2Row = 1.0 - w0Row - w1Row;
 
-        let yv1y = 0
-        let yv2y = 0
-        let yv3y = 0
-        let c1 = 0;
-        let c2 = 0;
-        let c3 = 0;
-        let preXv32 = 0;
-        let preXv21 = 0;
-        let preXv13 = 0;
+        // row-start planes for u', v', w' and depth z (all affine → adds only per pixel)
+        let upRow = w0Row * up0 + w1Row * up1 + w2Row * up2;
+        let vpRow = w0Row * vp0 + w1Row * vp1 + w2Row * vp2;
+        let wpRow = w0Row * wp0 + w1Row * wp1 + w2Row * wp2;
+        // depth (you can also keep clip/NDC depth; here we interpolate the screen z)
+        let zRow = w0Row * z0 + w1Row * z1 + w2Row * z2;
 
-        let shade = 1;
-        let preCalcShade = 255;
+        // gradients (x)
+        const dw0dx = de0dx * invArea;
+        const dw1dx = de1dx * invArea;
+        const dw2dx = -dw0dx - dw1dx;
 
-        let textureColor;
-        let textureX;
-        let textureY;
-        let uvX0;
-        let uvX1;
-        let uvX2;
-        let uvY0;
-        let uvY1;
-        let uvY2;
-        let index = 0;
-        textureColor = this.textures[face[1][3]][0];
-        textureX = this.textures[face[1][3]][1];
-        textureY = this.textures[face[1][3]][2];
-        uvX0 = textureX * face[1][0][0];
-        uvX1 = textureX * face[1][1][0];
-        uvX2 = textureX * face[1][2][0];
-        uvY0 = textureY * face[1][0][1];
-        uvY1 = textureY * face[1][1][1];
-        uvY2 = textureY * face[1][2][1];
-        //debut des boucles fin de la complexite o de 1 qui est vraiment crazy
-        for (let y = minY; y <= maxY; y++) {//optimisations possibles GENRE BEAUCOUP
-            //complexite o de n
-            DBI = y * this.width + vecMX;
-            pixelY = y * this.width * 4;
-            Vy1 = (y - face[0][3]) * v0[1];
-            Vy2 = (y - face[0][3]) * v1[1];
-            yv1y = y - face[0][3];
-            yv2y = y - face[0][4];
-            yv3y = y - face[0][5];
+        const dupdx = dw0dx * up0 + dw1dx * up1 + dw2dx * up2;
+        const dvpdx = dw0dx * vp0 + dw1dx * vp1 + dw2dx * vp2;
+        const dwpdx = dw0dx * wp0 + dw1dx * wp1 + dw2dx * wp2;
+        const dzdx = dw0dx * z0 + dw1dx * z1 + dw2dx * z2;
 
-            c1 = (v32x) * (yv2y)
-            c2 = (v13x) * (yv3y)
-            c3 = (v21x) * (yv1y)
+        // gradients (y)
+        const dw0dy = de0dy * invArea;
+        const dw1dy = de1dy * invArea;
+        const dw2dy = -dw0dy - dw1dy;
 
-            preXv32 = c1 - (vecMX) * v32y;
-            preXv13 = c2 - (vecMX) * v13y;
-            preXv21 = c3 - (vecMX) * v21y;
+        const dupdy = dw0dy * up0 + dw1dy * up1 + dw2dy * up2;
+        const dvpdy = dw0dy * vp0 + dw1dy * vp1 + dw2dy * vp2;
+        const dwpdy = dw0dy * wp0 + dw1dy * wp1 + dw2dy * wp2;
+        const dzdy = dw0dy * z0 + dw1dy * z1 + dw2dy * z2;
+
+        // --- raster loop ------------------------------------------------------------
+        const near = this.near;
+        for (let y = minY; y <= maxY; y++) {
+            let e0x = e0Row, e1x = e1Row, e2x = e2Row;
+            let up = upRow, vp = vpRow, wp = wpRow, z = zRow;
+
+            let di = y * W + minX;
+            let pi = ((y * W + minX) << 2);
 
             for (let x = minX; x <= maxX; x++) {
-                //complexite o de n^2 donc mettre le plus de choses avant
-                preXv32 -= v32y;
-                preXv13 -= v13y;
-                preXv21 -= v21y;
-                profiler[1][0]++;//metrics
-                DBI++;
-                depthValue = DB[DBI];
-                if (depthValue == 0 || bestZ < depthValue) {//si le cote le plus proche du triangle est plus loin que le point ecris au buffer, skip
-                    if (
-                        preXv32 + vertXv32y > 0 &&
-                        preXv13 + vertXv13y > 0 &&
-                        preXv21 + vertXv21y > 0
-                    ) {//tank la performance
-                        //je sauve des function calls en faisant ca
+                // edge test first (top-left rule via >=0). No casts for precision.
+                if (e0x >= 0 && e1x >= 0 && e2x >= 0) {
+                    // depth test
+                    const zOld = DB[di];
+                    if (zOld === 0 || z >= near && z < zOld) {
+                        DB[di] = z;
 
-                        alpha = ((x - face[0][0]) * v1[1] - v1[0] * (y - face[0][3])) * denom;
-                        beta = (v0[0] * (y - face[0][3]) - (x - face[0][0]) * v0[1]) * denom;
-                        gamma = 1 - alpha - beta;
-                        depth = gamma * face[0][6] + alpha * face[0][7] + beta * face[0][8];
-                        if ((depthValue == 0 || depthValue > depth) && depth > near) {
-                            DB[DBI] = depth;
-                            profiler[1][1]++;//metrics
-                            //light calculations
-                            if (false) {
+                        // perspective unwarp: u = up/wp, v = vp/wp
+                        const invWp = 1.0 / wp;
+                        let uu = (up * invWp) | 0;
+                        let vv = (vp * invWp) | 0;
 
-                                shade = (1 - (verts[0][3][1] * gamma + verts[1][3][1] * alpha + verts[2][3][1] * beta)) / 2
-                                if (shade < 0.1) {
-                                    shade = 0.1;
-                                }
-                            }
-                            pixelI = pixelY + (x - 1) * 4;
-                            if (this.uvMode) {
-                                preCalcShade = 255 * shade
-                                FB[pixelI] = gamma * preCalcShade;
-                                FB[pixelI + 1] = alpha * preCalcShade;
-                                FB[pixelI + 2] = beta * preCalcShade;
-                            }
-                            else {
-                                    index = 4 * (~~(gamma * uvX0 + alpha * uvX1 + beta * uvX2) + ~~(gamma * uvY0 + alpha * uvY1 + beta * uvY2) * textureX);//coute genre 20fps
-
-                                    FB[pixelI] = textureColor[index] * shade;
-                                    FB[pixelI + 1] = textureColor[index + 1] * shade;
-                                    FB[pixelI + 2] = textureColor[index + 2] * shade;
-                            }
-                        }
-                        InTri = true;
-                    }
-                    else {
-                        if (InTri) {
-                            //si on etais dans le triangle et maintenant on est sorti, il est impossible de retourner dans le triangle a partir de la meme ligne
-                            //pixelRef[2] += maxX - x;
-                            break;
+                        // clamp (cheap unsigned bound check)
+                        if ((uu >>> 0) < texW & (vv >>> 0) < texH) {
+                            const ti = ((vv * texW + uu) << 2);
+                            FB[pi] = texData[ti];
+                            FB[pi + 1] = texData[ti + 1];
+                            FB[pi + 2] = texData[ti + 2];
+                            //FB[pi + 3] = 255;
                         }
                     }
                 }
+                // advance x
+                e0x += de0dx; e1x += de1dx; e2x += de2dx;
+                up += dupdx; vp += dvpdx; wp += dwpdx; z += dzdx;
+                di++; pi += 4;
             }
-            InTri = false;
+
+            // next scanline
+            e0Row += de0dy; e1Row += de1dy; e2Row += de2dy;
+            upRow += dupdy; vpRow += dvpdy; wpRow += dwpdy; zRow += dzdy;
         }
     }
 }

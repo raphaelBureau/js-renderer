@@ -1,7 +1,8 @@
 import { MatrixRecycler } from "../Libs/matrixRecycler.js";
+import { V3D } from "../Libs/vec3D.js";
 
 export class Camera {
-    constructor() {
+    constructor(fov,aspect,near,far) {
         this.position = new Float32Array(3);
         this.rotation = new Float32Array(3);
         this.projectionMatrix = MatrixRecycler.Identity();
@@ -10,9 +11,11 @@ export class Camera {
         this.MatrixRecycler = new MatrixRecycler();
         this.intermediateMatrix = MatrixRecycler.Identity();
         this.viewportMatrix = MatrixRecycler.Identity();
-        this.SetPerspective(90 * Math.PI / 180, 1, 0.1, 1000);
-        this.speed = 1;
-        this.movement = [false, false, false, false, false, false]; //forward, backward, left, right, up, down
+        this.SetPerspective(fov,aspect,near,far);
+        this.speed = 15;
+        this.movement = [0, 0, 0, 0, 0, 0]; //forward, backward, left, right, up, down
+        this.look = [0, 0, 0, 0]; //up, down, left, right
+        this.lookSpeed = 0.45;
     }
     SetPerspective(fov, aspect, near, far) {
         let f = 1.0 / Math.tan(fov / 2);
@@ -37,20 +40,20 @@ export class Camera {
         this.viewportMatrix[0] = width / 2;
         this.viewportMatrix[1] = 0;
         this.viewportMatrix[2] = 0;
-        this.viewportMatrix[3] = 0;
+        this.viewportMatrix[3] = width / 2;
 
         this.viewportMatrix[4] = 0;
         this.viewportMatrix[5] = -height / 2;
         this.viewportMatrix[6] = 0;
-        this.viewportMatrix[7] = 0;
+        this.viewportMatrix[7] = height / 2;
 
         this.viewportMatrix[8] = 0;
         this.viewportMatrix[9] = 0;
         this.viewportMatrix[10] = 1;
         this.viewportMatrix[11] = 0;
 
-        this.viewportMatrix[12] = width / 2;
-        this.viewportMatrix[13] = height / 2;
+        this.viewportMatrix[12] = 0;
+        this.viewportMatrix[13] = 0;
         this.viewportMatrix[14] = 0;
         this.viewportMatrix[15] = 1;
     }
@@ -90,34 +93,31 @@ export class Camera {
         this.rotation[1] = vec[1];
         this.rotation[2] = vec[2];
     }
-    ProjectGeo(geo, buffer) {
-        for (let i = 0; i < geo.faces.length; i++) {
-            let vertCopy = new Float32Array(12);
-            vertCopy[0] = geo.faces[i][0][0];
-            vertCopy[1] = geo.faces[i][0][1];
-            vertCopy[2] = geo.faces[i][0][2];
-            vertCopy[3] = geo.faces[i][0][3];
-            vertCopy[4] = geo.faces[i][0][4];
-            vertCopy[5] = geo.faces[i][0][5];
-            vertCopy[6] = geo.faces[i][0][6];
-            vertCopy[7] = geo.faces[i][0][7];
-            vertCopy[8] = geo.faces[i][0][8];
-            vertCopy[9] = geo.faces[i][0][9];
-            vertCopy[10] = geo.faces[i][0][10];
-            vertCopy[11] = geo.faces[i][0][11];
-            let face = [vertCopy, geo.faces[i][1]];
-            this.MatrixRecycler.MatProdInto(this.translationMatrix, geo.transformMatrix, this.intermediateMatrix);
-            this.MatrixRecycler.MatProd(this.rotationMatrix, this.intermediateMatrix);
-            this.MatrixRecycler.MatProd(this.projectionMatrix, this.intermediateMatrix);
-            this.MatrixRecycler.MatProd(this.viewportMatrix, this.intermediateMatrix);
-            this.MatrixRecycler.Vec3Prod(this.intermediateMatrix, face[0]);
-            buffer.push(face);
+    ProjectGeo(geo) {
+        const intermediateMatrix = this.intermediateMatrix;
+        const MR = this.MatrixRecycler;
+        for (let i = 0; i < geo.length; i++) {
+            geo[i].vertices.set(geo[i].initialVertices);
+            MR.MatProdInto(this.translationMatrix, geo[i].transformMatrix, intermediateMatrix);
+            MR.MatProd(this.rotationMatrix, intermediateMatrix);
+            MR.MatProd(this.projectionMatrix, intermediateMatrix);
+            MR.TransformVertexArray(intermediateMatrix, geo[i].vertices);
+            for(let j=0; j<geo[i].vertices.length; j+=4) {
+                geo[i].wValues[j/4] = geo[i].vertices[j+3];
+                geo[i].vertices[j] /= geo[i].wValues[j/4];
+                geo[i].vertices[j+1] /= geo[i].wValues[j/4];
+                geo[i].vertices[j+2] /= geo[i].wValues[j/4];
+                geo[i].vertices[j+3] = 1;
+            }
+            MR.TransformVertexArray(this.viewportMatrix, geo[i].vertices);
         }
     }
-    Update(deltaTime = 1.016) {
-        this.position[0] += (this.movement[3] - this.movement[2]) * this.speed * deltaTime;
-        this.position[1] += (this.movement[5] - this.movement[4]) * this.speed * deltaTime;
-        this.position[2] += (this.movement[1] - this.movement[0]) * this.speed * deltaTime;
+    Update(deltaTime) {
+        V3D.AddR(this.rotation, V3D.SclR(deltaTime*this.lookSpeed,V3D.UnvR([this.look[1]-this.look[0],this.look[3]-this.look[2],0])));
+        this.SetRotation(this.rotation);
+        let pos = V3D.RotYR(-this.rotation[1], [(this.movement[2] - this.movement[3]), (this.movement[4] - this.movement[5]), (this.movement[0] - this.movement[1])]);
+        V3D.SclR(deltaTime*this.speed,V3D.UnvR(pos));
+        V3D.AddR(this.position, pos);
         this.SetPosition(this.position);
     }
 }
