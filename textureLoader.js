@@ -10,7 +10,6 @@ export class TextureLoader {
             img.src = "img/" + imageRef[i] + ".png";
             result.push(img);
         }
-        console.log(result);
         this.images = result;
         
     }

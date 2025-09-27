@@ -1,17 +1,15 @@
 import { MatrixRecycler } from "../Libs/matrixRecycler.js";
-export class Rasterizer {
-    constructor(canvas) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d', { willReadFrequently: true });
-        this.zBuffer;
-        this.width = window.innerWidth;
-        this.height = window.innerHeight;
-        canvas.width = this.width;
-        canvas.height = this.height;
-        this.depthBuffer = new Float32Array(this.width * this.height);
-        this.frameBuffer = this.ctx.createImageData(this.width, this.height);
-        this.near = 0.1;
-        this.textures = []; //[] 0:texture Byte Array, 1: Width, 2: Height
+import { Rasterizer } from "./rasterizer.js";
+export class BarycentricRasterizer {
+    constructor(rasterizer) {
+        this.canvas = rasterizer.canvas;
+        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        this.zBuffer = rasterizer.zBuffer;
+        this.width = rasterizer.width;
+        this.height = rasterizer.height;
+        this.depthBuffer = rasterizer.depthBuffer;
+        this.frameBuffer = rasterizer.frameBuffer;
+        this.near = rasterizer.near;
         this.MatrixRecycler = new MatrixRecycler();
     }
     DrawPolygons(buffer, profiler) {
@@ -46,20 +44,14 @@ export class Rasterizer {
         // per-vertex clip-space w captured earlier (BEFORE divide by w):
         const w0c = face[2].wValues[i0], w1c = face[2].wValues[i1], w2c = face[2].wValues[i2];
 
-        if(w0c<=0||w1c<=0||w2c<=0){//clipping
+        if (w0c <= 0 || w1c <= 0 || w2c <= 0) {//clipping
             return;
         }
-
-        // texture + UVs (match v0,v1,v2 order):
-        const texId = face[1][3];
-        const texData = this.textures[texId][0];
-        const texW = this.textures[texId][1] | 0;
-        const texH = this.textures[texId][2] | 0;
         // UVs in [0,1] scaled to texels (top-left origin). If your images are bottom-left,
         // either flip here: uvY* = texH - 1 - (face[1][k][1]*texH) or flip at sample time.
-        const u0 = face[1][0][0] * texW, v0uv = face[1][0][1] * texH;
-        const u1 = face[1][1][0] * texW, v1uv = face[1][1][1] * texH;
-        const u2 = face[1][2][0] * texW, v2uv = face[1][2][1] * texH;
+        const u0 = face[1][0][0], v0uv = face[1][0][1];
+        const u1 = face[1][1][0], v1uv = face[1][1][1];
+        const u2 = face[1][2][0], v2uv = face[1][2][1];
 
         // --- build bounding box (clamp)
         const W = this.width | 0, H = this.height | 0, DB = this.depthBuffer, FB = this.frameBuffer.data;
@@ -149,22 +141,14 @@ export class Rasterizer {
                     profiler[1][0]++;
                     const zOld = DB[di];
                     if (zOld === 0 || z >= near && z < zOld) {
-                        DB[di] = z;
-
-                        // perspective unwarp: u = up/wp, v = vp/wp
-                        const invWp = 1.0 / wp;
-                        let uu = (up * invWp) | 0;
-                        let vv = (vp * invWp) | 0;
-
-                        // clamp (cheap unsigned bound check)
-                        if ((uu >>> 0) < texW & (vv >>> 0) < texH) {
-                            profiler[1][1]++;
-                            const ti = ((vv * texW + uu) << 2);
-                            FB[pi] = texData[ti];
-                            FB[pi + 1] = texData[ti + 1];
-                            FB[pi + 2] = texData[ti + 2];
-                            //FB[pi + 3] = 255;
-                        }
+                        const w0 = e0x * invArea;   // α for vertex 0
+                        const w1 = e1x * invArea;   // β for vertex 1
+                        const w2 = 1 - w0 - w1;     // γ for vertex 2 (or: e2x * invArea)
+                        
+                        profiler[1][1]++;
+                        FB[pi] = (w0 * 255 + 0.5) | 0;  // R ← α
+                        FB[pi + 1] = (w1 * 255 + 0.5) | 0;  // G ← β
+                        FB[pi + 2] = (w2 * 255 + 0.5) | 0;  // B ← γ
                     }
                 }
                 // advance x

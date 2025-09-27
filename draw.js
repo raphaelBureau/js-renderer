@@ -21,27 +21,27 @@ export class Draw2D { //utilise les fonctions du canvas
         this.ctx.closePath();
     }
 
-    Polygon(vertices, style = [255,0,0,1], wireframe= false) { //fonctionne pour toutes les formes solides 2d 
+    Polygon(vertices, style = [255, 0, 0, 1], wireframe = false) { //fonctionne pour toutes les formes solides 2d 
         this.ctx.beginPath(); //mettre dans un zbuffer avant et order by z DESC
         this.ctx.fillStyle = "rgba(" + style[0] + "," + style[1] + "," + style[2] + "," + style[3] + ")";
-        if(style[3] != 1) {
-        this.ctx.strokeStyle = "rgba(" + style[0] + "," + style[1] + "," + style[2] + "," + style[3] * 0.1 + ")";
+        if (style[3] != 1) {
+            this.ctx.strokeStyle = "rgba(" + style[0] + "," + style[1] + "," + style[2] + "," + style[3] * 0.1 + ")";
         }
-        else{
-        this.ctx.strokeStyle = "rgba(" + style[0] + "," + style[1] + "," + style[2] + ",1)";
+        else {
+            this.ctx.strokeStyle = "rgba(" + style[0] + "," + style[1] + "," + style[2] + ",1)";
         }
-        if(style[3] != 1 && wireframe) {
+        if (style[3] != 1 && wireframe) {
             this.ctx.strokeStyle = "rgba(255,255,255,1)";
         }
         this.ctx.lineWidth = 1;
-        this.ctx.moveTo(vertices[0][0],vertices[0][1]);
+        this.ctx.moveTo(vertices[0][0], vertices[0][1]);
         for (let i = 1; i < vertices.length; i++) {
-           this.ctx.lineTo(vertices[i][0],vertices[i][1]);
+            this.ctx.lineTo(vertices[i][0], vertices[i][1]);
         }
-        this.ctx.lineTo(vertices[0][0],vertices[0][1]);
+        this.ctx.lineTo(vertices[0][0], vertices[0][1]);
         this.ctx.stroke(); //fix transparent borders
-        if(!wireframe) {
-        this.ctx.fill();//disable for wireframe mode
+        if (!wireframe) {
+            this.ctx.fill();//disable for wireframe mode
         }
         this.ctx.closePath();
     }
@@ -59,14 +59,29 @@ export class Draw2D { //utilise les fonctions du canvas
         this.ctx.lineTo(vertex2[0], vertex2[1]);
         this.ctx.stroke();
     }
-    Bar(x = 0, y = 0, percent = 100, width = 100, height = 50, inColor = "red", outColor = "black") {
+    Bar(x = 0, y = 0, amount, width = 100, height = 50, inColor = "red", outColor = "black", border = 0) {
         this.ctx.beginPath();
         this.ctx.fillStyle = outColor;
         this.ctx.rect(x, y, width, height);
         this.ctx.fill();
         this.ctx.beginPath();
         this.ctx.fillStyle = inColor;
-        this.ctx.rect(x, y, width * percent / 100, height);
+        this.ctx.rect(x + border, y + border, width * amount - border * 2, height - border * 2);
         this.ctx.fill();
+    }
+    BarGraph(x = 0, y = 0, data, width = 500, height = 200, colors = []) {
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) {
+            sum += data[i];
+        }
+        let barX = x;
+        for (let i = 0; i < data.length; i++) {
+            const barWidth = width * data[i] / sum;
+            this.ctx.beginPath();
+            this.ctx.fillStyle = colors[i];
+            this.ctx.rect(barX, y, barWidth, height);
+            this.ctx.fill();
+            barX += barWidth;
+        }
     }
 }

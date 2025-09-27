@@ -1,26 +1,30 @@
 import { MatrixRecycler } from "../Libs/matrixRecycler.js";
-export class Rasterizer {
-    constructor(canvas) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d', { willReadFrequently: true });
-        this.zBuffer;
-        this.width = window.innerWidth;
-        this.height = window.innerHeight;
-        canvas.width = this.width;
-        canvas.height = this.height;
-        this.depthBuffer = new Float32Array(this.width * this.height);
-        this.frameBuffer = this.ctx.createImageData(this.width, this.height);
-        this.near = 0.1;
-        this.textures = []; //[] 0:texture Byte Array, 1: Width, 2: Height
+import { Rasterizer } from "./rasterizer.js";
+export class InterlacedRasterizer {
+    constructor(rasterizer) {
+        this.canvas = rasterizer.canvas;
+        this.ctx = rasterizer.ctx;
+        this.zBuffer = rasterizer.zBuffer;
+        this.width = rasterizer.width;
+        this.height = rasterizer.height;
+        this.depthBuffer = rasterizer.depthBuffer;
+        this.frameBuffer = rasterizer.frameBuffer;
+        this.near = rasterizer.near;
+        this.textures = rasterizer.textures; //[] 0:texture Byte Array, 1: Width, 2: Height
+        this.interlacedState = false;
         this.MatrixRecycler = new MatrixRecycler();
     }
     DrawPolygons(buffer, profiler) {
         let len = buffer.length;
+        let interlacedState = this.interlacedState;
         for (let i = 0; i < this.frameBuffer.data.length; i += 4) {
+            if(interlacedState) {
             this.frameBuffer.data[i] = 50;
             this.frameBuffer.data[i + 1] = 50;
             this.frameBuffer.data[i + 2] = 50;
             this.frameBuffer.data[i + 3] = 255;
+            }
+            interlacedState = !interlacedState;
         }
         for (let i = this.depthBuffer.length; i--;) {
             this.depthBuffer[i] = 0;
@@ -29,6 +33,7 @@ export class Rasterizer {
             this.DrawTriangle(buffer[i], profiler);
         }
         this.SendFrameData();
+        this.interlacedState = !this.interlacedState;
     }
     SendFrameData() {
         this.ctx.putImageData(this.frameBuffer, 0, 0);
@@ -46,7 +51,7 @@ export class Rasterizer {
         // per-vertex clip-space w captured earlier (BEFORE divide by w):
         const w0c = face[2].wValues[i0], w1c = face[2].wValues[i1], w2c = face[2].wValues[i2];
 
-        if(w0c<=0||w1c<=0||w2c<=0){//clipping
+        if (w0c <= 0 || w1c <= 0 || w2c <= 0) {//clipping
             return;
         }
 
@@ -135,6 +140,7 @@ export class Rasterizer {
         const near = this.near;
         profiler[0][4] += performance.now() - vertTimeStart;
         const fragTimeStart = performance.now();
+        let interlacedState = ((minX + minY) % 2 === 0) === this.interlacedState;
         for (let y = minY; y <= maxY; y++) {
             let e0x = e0Row, e1x = e1Row, e2x = e2Row;
             let up = upRow, vp = vpRow, wp = wpRow, z = zRow;
@@ -143,30 +149,33 @@ export class Rasterizer {
             let pi = ((y * W + minX) << 2);
 
             for (let x = minX; x <= maxX; x++) {
-                // edge test first (top-left rule via >=0). No casts for precision.
-                if (e0x >= 0 && e1x >= 0 && e2x >= 0) {
-                    // depth test
-                    profiler[1][0]++;
-                    const zOld = DB[di];
-                    if (zOld === 0 || z >= near && z < zOld) {
-                        DB[di] = z;
+                if (interlacedState) {
+                    // edge test first (top-left rule via >=0). No casts for precision.
+                    if (e0x >= 0 && e1x >= 0 && e2x >= 0) {
+                        // depth test
+                        profiler[1][0]++;
+                        const zOld = DB[di];
+                        if (zOld === 0 || z >= near && z < zOld) {
+                            DB[di] = z;
 
-                        // perspective unwarp: u = up/wp, v = vp/wp
-                        const invWp = 1.0 / wp;
-                        let uu = (up * invWp) | 0;
-                        let vv = (vp * invWp) | 0;
+                            // perspective unwarp: u = up/wp, v = vp/wp
+                            const invWp = 1.0 / wp;
+                            let uu = (up * invWp) | 0;
+                            let vv = (vp * invWp) | 0;
 
-                        // clamp (cheap unsigned bound check)
-                        if ((uu >>> 0) < texW & (vv >>> 0) < texH) {
-                            profiler[1][1]++;
-                            const ti = ((vv * texW + uu) << 2);
-                            FB[pi] = texData[ti];
-                            FB[pi + 1] = texData[ti + 1];
-                            FB[pi + 2] = texData[ti + 2];
-                            //FB[pi + 3] = 255;
+                            // clamp (cheap unsigned bound check)
+                            if ((uu >>> 0) < texW & (vv >>> 0) < texH) {
+                                profiler[1][1]++;
+                                const ti = ((vv * texW + uu) << 2);
+                                FB[pi] = texData[ti];
+                                FB[pi + 1] = texData[ti + 1];
+                                FB[pi + 2] = texData[ti + 2];
+                                //FB[pi + 3] = 255;
+                            }
                         }
                     }
                 }
+                interlacedState = !interlacedState;
                 // advance x
                 e0x += de0dx; e1x += de1dx; e2x += de2dx;
                 up += dupdx; vp += dvpdx; wp += dwpdx; z += dzdx;
