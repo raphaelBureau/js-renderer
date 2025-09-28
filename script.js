@@ -2,10 +2,12 @@ import { TextureLoader } from "./textureLoader.js";
 import { Rasterizer } from "./rasterizer.js";
 import { KeyEvents } from "./KeyEvents.js";
 import { Camera } from "./camera.js";
-import { Cube } from "./cube.js";
+import { Cube } from "./primitives/cube.js";
 import { Draw2D } from "./draw.js";
 import { BarycentricRasterizer } from "./barycentricRasterizer.js";
 import { InterlacedRasterizer } from "./interlacedRasterizer.js";
+import { V3D } from "../Libs/vec3D.js";
+import { Cone } from "./primitives/cone.js";
 
 const c = document.getElementById("view");
 const ctx = c.getContext('2d');
@@ -46,9 +48,10 @@ KE.AddEvent("arrowdown", () => camera.look[1] = 1, () => camera.look[1] = 0);
 KE.AddEvent("y", () => keys.y = !keys.y);
 KE.AddEvent("i", () => keys.i = !keys.i);
 
-const cube1 = new Cube([0, 0, -50], [0, 0, 0], 10);
+const cube1 = new Cube([0, 25, -50], [0, 0, 0], 10);
 const cube2 = new Cube([0, 0, 50], [0, 0, 0], 8);
-let objects = [cube1, cube2];
+const cone = new Cone([20, 0, -50], [0, 1.5, 0], 5, 15, 12, 0);
+let objects = [cube1, cube2, cone];
 
 let faceBuffer = [];
 for (let obj of objects) {
@@ -66,7 +69,8 @@ function NewFrame() {
     lastTime = thisTime;
     elapsedTime += deltaTime;
     profiler[0][2] = performance.now();
-    cube1.AddRotation([0.01, 0.01, 0]);
+    cube1.AddRotation(V3D.SclR(deltaTime*20, [0.01, 0.01, 0]));
+    cone.AddRotation(V3D.SclR(deltaTime*10, [0, 0.1, 0]));
     camera.Update(deltaTime);
     profiler[0][2] = performance.now() - profiler[0][2];
     profiler[0][3] = performance.now();

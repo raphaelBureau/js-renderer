@@ -1,4 +1,4 @@
-import { Geo } from "./geo.js";
+import { Geo } from "../geo.js";
 export class Cube extends Geo {
     constructor(position = [0, 0, 0], rotation = [0, 0, 0], size = 5) {
         let texture = 0;

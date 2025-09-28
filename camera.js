@@ -15,7 +15,7 @@ export class Camera {
         this.speed = 15;
         this.movement = [0, 0, 0, 0, 0, 0]; //forward, backward, left, right, up, down
         this.look = [0, 0, 0, 0]; //up, down, left, right
-        this.lookSpeed = 0.45;
+        this.lookSpeed = 1;
     }
     SetPerspective(fov, aspect, near, far) {
         let f = 1.0 / Math.tan(fov / 2);
